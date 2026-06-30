@@ -1,0 +1,12 @@
+{
+  "name": "mca-odata-server",
+  "version": "1.0.0",
+  "description": "OData 2.0 server for MCA loan restructuring data",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MCA Advance Records</title>
+  <title>Public User Records</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f6f9; color: #222; }
@@ -42,14 +42,13 @@
 
 <header>
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-  <h1>MCA Advance Records</h1>
-  <span>Live OData Admin &nbsp;·&nbsp; Changes reflect instantly in Salesforce</span>
+  <h1>Public User Records</h1>
 </header>
 
 <div class="container">
   <div class="card">
     <div class="card-header">
-      <h2>MCA Advances <span id="count" style="color:#888;font-weight:400"></span></h2>
+      <h2>User Records <span id="count" style="color:#888;font-weight:400"></span></h2>
       <button class="btn btn-add" onclick="toggleAddForm()">+ Add Record</button>
     </div>
     <table>
@@ -84,18 +83,11 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const API = '';
   let data = [];
 
   async function load() {
-    const res = await fetch(`${API}/MCA_Advances`);
-    const json = await res.json();
-    data = json.d.results.map(r => ({
-      AdvanceId: r.AdvanceId,
-      OwnerName: r.OwnerName,
-      SSN: r.SSN,
-      DriversLicense: r.DriversLicense
-    }));
+    const res = await fetch('/api/advances');
+    data = await res.json();
     render();
   }
 
@@ -136,7 +128,7 @@
     ['OwnerName','SSN','DriversLicense'].forEach(field => {
       body[field] = document.getElementById(`inp-${field}-${i}`).value;
     });
-    const res = await fetch(`/MCA_Advances('${id}')`, {
+    const res = await fetch(`/api/advances/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -144,7 +136,7 @@
     if (res.ok) {
       data[i] = { ...data[i], ...body };
       render();
-      toast('Record updated — refresh Salesforce to see the change');
+      toast('Record updated');
     } else {
       toast('Error saving record', true);
     }
@@ -153,7 +145,7 @@
   async function deleteRecord(i) {
     const id = data[i].AdvanceId;
     if (!confirm(`Delete ${id}?`)) return;
-    const res = await fetch(`/MCA_Advances('${id}')`, { method: 'DELETE' });
+    const res = await fetch(`/api/advances/${id}`, { method: 'DELETE' });
     if (res.ok) {
       data.splice(i, 1);
       render();
@@ -175,7 +167,7 @@
       DriversLicense: document.getElementById('new-DriversLicense').value.trim()
     };
     if (!body.AdvanceId) { alert('Advance ID is required'); return; }
-    const res = await fetch('/MCA_Advances', {
+    const res = await fetch('/api/advances', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)

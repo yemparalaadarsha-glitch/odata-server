@@ -123,6 +123,27 @@ app.use((req, res, next) => {
 // Admin UI
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
+// JSON API for admin UI (separate from OData endpoints which return Atom XML)
+app.get('/api/advances', (req, res) => res.json(advances));
+app.post('/api/advances', (req, res) => {
+  const rec = req.body;
+  if (!rec.AdvanceId) return res.status(400).json({ error: 'AdvanceId required' });
+  advances.push(rec);
+  res.status(201).json(rec);
+});
+app.patch('/api/advances/:id', (req, res) => {
+  const i = advances.findIndex(a => a.AdvanceId === req.params.id);
+  if (i === -1) return res.status(404).json({ error: 'Not found' });
+  advances[i] = { ...advances[i], ...req.body };
+  res.json(advances[i]);
+});
+app.delete('/api/advances/:id', (req, res) => {
+  const i = advances.findIndex(a => a.AdvanceId === req.params.id);
+  if (i === -1) return res.status(404).json({ error: 'Not found' });
+  advances.splice(i, 1);
+  res.status(204).send();
+});
+
 // Service root
 app.get('/', (req, res) => {
   const base = `${baseUrl(req)}/`;

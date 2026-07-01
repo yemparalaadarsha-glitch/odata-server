@@ -13,19 +13,19 @@ const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
         <Key>
           <PropertyRef Name="AdvanceId"/>
         </Key>
-        <Property Name="AdvanceId" Type="Edm.String" Nullable="false"/>
-        <Property Name="OwnerName" Type="Edm.String" Nullable="true"/>
-        <Property Name="SSN" Type="Edm.String" Nullable="true"/>
-        <Property Name="DriversLicense" Type="Edm.String" Nullable="true"/>
-        <NavigationProperty Name="MCA_Documents" Relationship="MCALending.FK_Advance_Documents" ToRole="Documents" FromRole="Advance"/>
+        <Property Name="AdvanceId" Type="Edm.String" Nullable="false" MaxLength="50" FixedLength="false" Unicode="true" />
+        <Property Name="OwnerName" Type="Edm.String" Nullable="true" MaxLength="100" FixedLength="false" Unicode="true" />
+        <Property Name="SSN" Type="Edm.String" Nullable="true" MaxLength="20" FixedLength="false" Unicode="true" />
+        <Property Name="DriversLicense" Type="Edm.String" Nullable="true" MaxLength="50" FixedLength="false" Unicode="true" />
+        <NavigationProperty Name="MCA_Documents" Relationship="MCALending.FK_Advance_Documents" ToRole="Documents" FromRole="Advance" />
       </EntityType>
       <EntityType Name="MCA_Document">
         <Key>
           <PropertyRef Name="DocumentId"/>
         </Key>
-        <Property Name="DocumentId" Type="Edm.String" Nullable="false"/>
-        <Property Name="AdvanceId" Type="Edm.String" Nullable="true"/>
-        <Property Name="DocumentType" Type="Edm.String" Nullable="true"/>
+        <Property Name="DocumentId" Type="Edm.String" Nullable="false" MaxLength="50" FixedLength="false" Unicode="true" />
+        <Property Name="AdvanceId" Type="Edm.String" Nullable="true" MaxLength="50" FixedLength="false" Unicode="true" />
+        <Property Name="DocumentType" Type="Edm.String" Nullable="true" MaxLength="50" FixedLength="false" Unicode="true" />
         <NavigationProperty Name="MCA_Advance" Relationship="MCALending.FK_Advance_Documents" ToRole="Advance" FromRole="Documents"/>
       </EntityType>
       <Association Name="FK_Advance_Documents">

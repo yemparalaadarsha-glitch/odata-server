@@ -87,7 +87,14 @@ app.get('/', (req, res) => {
   res.send(xml);
 });
 
-// GET all advances (with $filter, $top, $skip, $orderby support)
+// GET record count (e.g. Salesforce sends /MCA_Advances/$count)
+app.get('/MCA_Advances/\\$count', (req, res) => {
+  res.set('Content-Type', 'text/plain');
+  res.set('Cache-Control', 'no-transform');
+  res.send(String(advances.length));
+});
+
+// GET all advances (with $filter, $top, $skip, $orderby, $select, $inlinecount support)
 app.get('/MCA_Advances', (req, res) => {
   let results = [...advances];
 
@@ -100,18 +107,34 @@ app.get('/MCA_Advances', (req, res) => {
   }
 
   if (req.query['$orderby']) {
-    const [field, dir] = req.query['$orderby'].split(' ');
+    const [field, dir] = req.query['$orderby'].split(/\s+/);
     results.sort((a, b) => {
       const cmp = String(a[field] ?? '').localeCompare(String(b[field] ?? ''));
       return dir === 'desc' ? -cmp : cmp;
     });
   }
 
+  const totalCount = results.length;
+
   if (req.query['$skip']) results = results.slice(parseInt(req.query['$skip']));
   if (req.query['$top']) results = results.slice(0, parseInt(req.query['$top']));
 
+  // Apply $select — only include requested fields (plus __metadata)
+  const selectFields = req.query['$select'] ? req.query['$select'].split(',').map(f => f.trim()) : null;
+  const mapped = results.map(a => {
+    const base = withMetadata(req, a);
+    if (!selectFields) return base;
+    const filtered = { __metadata: base.__metadata };
+    selectFields.forEach(f => { if (f in a) filtered[f] = a[f]; });
+    return filtered;
+  });
+
+  const body = { results: mapped };
+  // $inlinecount=allpages tells us to include the total count before $top/$skip
+  if (req.query['$inlinecount'] === 'allpages') body.__count = String(totalCount);
+
   res.set('Cache-Control', 'no-transform');
-  res.json({ d: { results: results.map(a => withMetadata(req, a)) } });
+  res.json({ d: body });
 });
 
 // CREATE advance

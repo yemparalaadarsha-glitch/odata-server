@@ -4,23 +4,23 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-let advances = require('./data');
+let records = require('./data');
 
 const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
 <edmx:Edmx Version="1.0" xmlns:edmx="http://schemas.microsoft.com/ado/2007/06/edmx">
   <edmx:DataServices xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" m:DataServiceVersion="1.0" m:MaxDataServiceVersion="3.0">
-    <Schema Namespace="MCALending" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
-      <EntityType Name="MCA_Advance">
+    <Schema Namespace="PublicData" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+      <EntityType Name="PublicRecord">
         <Key>
-          <PropertyRef Name="AdvanceId"/>
+          <PropertyRef Name="UserId"/>
         </Key>
-        <Property Name="AdvanceId" Type="Edm.String" Nullable="false" MaxLength="50" FixedLength="false" Unicode="true" />
+        <Property Name="UserId" Type="Edm.String" Nullable="false" MaxLength="50" FixedLength="false" Unicode="true" />
         <Property Name="OwnerName" Type="Edm.String" Nullable="true" MaxLength="100" FixedLength="false" Unicode="true" />
         <Property Name="SSN" Type="Edm.String" Nullable="true" MaxLength="20" FixedLength="false" Unicode="true" />
         <Property Name="DriversLicense" Type="Edm.String" Nullable="true" MaxLength="50" FixedLength="false" Unicode="true" />
       </EntityType>
-      <EntityContainer Name="MCALendingContainer" m:IsDefaultEntityContainer="true">
-        <EntitySet Name="MCA_Advances" EntityType="MCALending.MCA_Advance"/>
+      <EntityContainer Name="PublicDataContainer" m:IsDefaultEntityContainer="true">
+        <EntitySet Name="PublicRecords" EntityType="PublicData.PublicRecord"/>
       </EntityContainer>
     </Schema>
   </edmx:DataServices>
@@ -29,31 +29,31 @@ const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
 const baseUrl = (req) => `https://${req.get('host')}`;
 const NOW = new Date().toISOString();
 
-const toAtomEntry = (req, adv) => {
-  const base = baseUrl(req);
-  return `<entry>
-    <id>${base}/MCA_Advances('${adv.AdvanceId}')</id>
-    <category term="MCALending.MCA_Advance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
-    <link rel="edit" title="MCA_Advance" href="MCA_Advances('${adv.AdvanceId}')"/>
-    <title/>
-    <updated>${NOW}</updated>
-    <author><name/></author>
-    <content type="application/xml">
-      <m:properties xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-        <d:AdvanceId>${esc(adv.AdvanceId)}</d:AdvanceId>
-        <d:OwnerName>${esc(adv.OwnerName)}</d:OwnerName>
-        <d:SSN>${esc(adv.SSN)}</d:SSN>
-        <d:DriversLicense>${esc(adv.DriversLicense)}</d:DriversLicense>
-      </m:properties>
-    </content>
-  </entry>`;
-};
-
 const esc = (v) => String(v ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;');
+
+const toAtomEntry = (req, rec) => {
+  const base = baseUrl(req);
+  return `<entry>
+    <id>${base}/PublicRecords('${rec.UserId}')</id>
+    <category term="PublicData.PublicRecord" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+    <link rel="edit" title="PublicRecord" href="PublicRecords('${rec.UserId}')"/>
+    <title/>
+    <updated>${NOW}</updated>
+    <author><name/></author>
+    <content type="application/xml">
+      <m:properties xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+        <d:UserId>${esc(rec.UserId)}</d:UserId>
+        <d:OwnerName>${esc(rec.OwnerName)}</d:OwnerName>
+        <d:SSN>${esc(rec.SSN)}</d:SSN>
+        <d:DriversLicense>${esc(rec.DriversLicense)}</d:DriversLicense>
+      </m:properties>
+    </content>
+  </entry>`;
+};
 
 const xmlHeaders = (res) => {
   res.set('Content-Type', 'application/atom+xml;charset=utf-8');
@@ -63,9 +63,11 @@ const xmlHeaders = (res) => {
 
 // Middleware: $metadata + parameterized entity routes
 app.use((req, res, next) => {
-  const interestingHeaders = ['accept', 'dataserviceversion', 'maxdataserviceversion', 'user-agent', 'content-type'];
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} | query: ${JSON.stringify(req.query)}`);
+
+  const interestingHeaders = ['accept', 'dataserviceversion', 'maxdataserviceversion', 'user-agent'];
   const hdrs = Object.fromEntries(interestingHeaders.filter(h => req.headers[h]).map(h => [h, req.headers[h]]));
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} | query: ${JSON.stringify(req.query)} | headers: ${JSON.stringify(hdrs)}`);
+  if (Object.keys(hdrs).length) console.log(`  headers: ${JSON.stringify(hdrs)}`);
 
   if (req.path === '/$metadata') {
     res.set('Content-Type', 'application/xml;charset=utf-8');
@@ -74,29 +76,29 @@ app.use((req, res, next) => {
     return res.send(METADATA_XML);
   }
 
-  const entityMatch = req.path.match(/^\/MCA_Advances\('([^']+)'\)$/);
+  const entityMatch = req.path.match(/^\/PublicRecords\('([^']+)'\)$/);
   if (entityMatch) {
     const id = entityMatch[1];
-    const index = advances.findIndex(a => a.AdvanceId === id);
+    const index = records.findIndex(r => r.UserId === id);
 
     if (req.method === 'GET') {
       if (index === -1) return res.status(404).send('Not found');
-      const adv = advances[index];
+      const rec = records[index];
       const base = baseUrl(req);
       const xml = `<?xml version="1.0" encoding="utf-8"?>
 <entry xml:base="${base}/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-  <id>${base}/MCA_Advances('${adv.AdvanceId}')</id>
-  <category term="MCALending.MCA_Advance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
-  <link rel="edit" title="MCA_Advance" href="MCA_Advances('${adv.AdvanceId}')"/>
+  <id>${base}/PublicRecords('${rec.UserId}')</id>
+  <category term="PublicData.PublicRecord" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+  <link rel="edit" title="PublicRecord" href="PublicRecords('${rec.UserId}')"/>
   <title/>
   <updated>${NOW}</updated>
   <author><name/></author>
   <content type="application/xml">
     <m:properties>
-      <d:AdvanceId>${esc(adv.AdvanceId)}</d:AdvanceId>
-      <d:OwnerName>${esc(adv.OwnerName)}</d:OwnerName>
-      <d:SSN>${esc(adv.SSN)}</d:SSN>
-      <d:DriversLicense>${esc(adv.DriversLicense)}</d:DriversLicense>
+      <d:UserId>${esc(rec.UserId)}</d:UserId>
+      <d:OwnerName>${esc(rec.OwnerName)}</d:OwnerName>
+      <d:SSN>${esc(rec.SSN)}</d:SSN>
+      <d:DriversLicense>${esc(rec.DriversLicense)}</d:DriversLicense>
     </m:properties>
   </content>
 </entry>`;
@@ -106,13 +108,13 @@ app.use((req, res, next) => {
 
     if (req.method === 'PATCH' || req.method === 'PUT') {
       if (index === -1) return res.status(404).json({ error: 'Not found' });
-      advances[index] = { ...advances[index], ...req.body };
+      records[index] = { ...records[index], ...req.body };
       return res.status(204).send();
     }
 
     if (req.method === 'DELETE') {
       if (index === -1) return res.status(404).json({ error: 'Not found' });
-      advances.splice(index, 1);
+      records.splice(index, 1);
       return res.status(204).send();
     }
   }
@@ -123,24 +125,24 @@ app.use((req, res, next) => {
 // Admin UI
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
-// JSON API for admin UI (separate from OData endpoints which return Atom XML)
-app.get('/api/advances', (req, res) => res.json(advances));
-app.post('/api/advances', (req, res) => {
+// JSON API for admin UI
+app.get('/api/records', (req, res) => res.json(records));
+app.post('/api/records', (req, res) => {
   const rec = req.body;
-  if (!rec.AdvanceId) return res.status(400).json({ error: 'AdvanceId required' });
-  advances.push(rec);
+  if (!rec.UserId) return res.status(400).json({ error: 'UserId required' });
+  records.push(rec);
   res.status(201).json(rec);
 });
-app.patch('/api/advances/:id', (req, res) => {
-  const i = advances.findIndex(a => a.AdvanceId === req.params.id);
+app.patch('/api/records/:id', (req, res) => {
+  const i = records.findIndex(r => r.UserId === req.params.id);
   if (i === -1) return res.status(404).json({ error: 'Not found' });
-  advances[i] = { ...advances[i], ...req.body };
-  res.json(advances[i]);
+  records[i] = { ...records[i], ...req.body };
+  res.json(records[i]);
 });
-app.delete('/api/advances/:id', (req, res) => {
-  const i = advances.findIndex(a => a.AdvanceId === req.params.id);
+app.delete('/api/records/:id', (req, res) => {
+  const i = records.findIndex(r => r.UserId === req.params.id);
   if (i === -1) return res.status(404).json({ error: 'Not found' });
-  advances.splice(i, 1);
+  records.splice(i, 1);
   res.status(204).send();
 });
 
@@ -150,9 +152,9 @@ app.get('/', (req, res) => {
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <service xml:base="${base}" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app" xmlns="http://www.w3.org/2007/app">
   <workspace>
-    <atom:title>MCA Lending</atom:title>
-    <collection href="MCA_Advances">
-      <atom:title>MCA_Advances</atom:title>
+    <atom:title>Public Records</atom:title>
+    <collection href="PublicRecords">
+      <atom:title>PublicRecords</atom:title>
     </collection>
   </workspace>
 </service>`;
@@ -163,15 +165,15 @@ app.get('/', (req, res) => {
 });
 
 // GET count
-app.get('/MCA_Advances/\\$count', (req, res) => {
+app.get('/PublicRecords/\\$count', (req, res) => {
   res.set('Content-Type', 'text/plain');
   res.set('DataServiceVersion', '1.0');
-  res.send(String(advances.length));
+  res.send(String(records.length));
 });
 
-// GET all advances — returns Atom XML feed
-app.get('/MCA_Advances', (req, res) => {
-  let results = [...advances];
+// GET all records — Atom XML feed
+app.get('/PublicRecords', (req, res) => {
+  let results = [...records];
 
   if (req.query['$filter']) {
     const match = req.query['$filter'].match(/(\w+)\s+eq\s+'([^']+)'/);
@@ -194,16 +196,16 @@ app.get('/MCA_Advances', (req, res) => {
   if (req.query['$top']) results = results.slice(0, parseInt(req.query['$top']));
 
   const base = baseUrl(req);
-  const countTag = (req.query['$inlinecount'] === 'allpages')
+  const countTag = req.query['$inlinecount'] === 'allpages'
     ? `\n  <m:count>${totalCount}</m:count>` : '';
 
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <feed xml:base="${base}/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-  <title type="text">MCA_Advances</title>
-  <id>${base}/MCA_Advances</id>
+  <title type="text">PublicRecords</title>
+  <id>${base}/PublicRecords</id>
   <updated>${NOW}</updated>
-  <link rel="self" title="MCA_Advances" href="MCA_Advances"/>${countTag}
-  ${results.map(a => toAtomEntry(req, a)).join('\n  ')}
+  <link rel="self" title="PublicRecords" href="PublicRecords"/>${countTag}
+  ${results.map(r => toAtomEntry(req, r)).join('\n  ')}
 </feed>`;
 
   xmlHeaders(res);
@@ -211,5 +213,5 @@ app.get('/MCA_Advances', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`MCA OData server (AtomPub) running on port ${PORT}`);
+  console.log(`Public Records OData server running on port ${PORT}`);
 });

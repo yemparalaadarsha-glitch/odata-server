@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MCA Advance Records</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f6f9; color: #222; }
+    header { background: #0070d2; color: white; padding: 16px 32px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+    header span { font-size: 0.85rem; opacity: 0.8; }
+    .container { max-width: 960px; margin: 32px auto; padding: 0 16px; }
+    .card { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); overflow: hidden; }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid #e5e5e5; display: flex; justify-content: space-between; align-items: center; }
+    .card-header h2 { font-size: 1rem; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th { background: #f8f9fb; text-align: left; padding: 10px 14px; font-weight: 600; color: #555; border-bottom: 1px solid #e5e5e5; }
+    td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8f9ff; }
+    input.cell-input { border: 1px solid #0070d2; border-radius: 4px; padding: 5px 8px; width: 100%; font-size: 0.9rem; outline: none; }
+    .badge { display: inline-block; background: #e8f4e8; color: #2e7d32; border-radius: 4px; padding: 2px 8px; font-size: 0.78rem; font-weight: 600; }
+    .btn { border: none; border-radius: 4px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer; font-weight: 500; transition: opacity .15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-edit   { background: #e8f0fe; color: #1a73e8; }
+    .btn-save   { background: #0070d2; color: white; }
+    .btn-cancel { background: #f0f0f0; color: #555; margin-left: 4px; }
+    .btn-delete { background: #fde8e8; color: #c0392b; margin-left: 4px; }
+    .btn-add    { background: #0070d2; color: white; }
+    .actions { display: flex; gap: 4px; white-space: nowrap; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #2e7d32; color: white; padding: 12px 20px; border-radius: 6px; font-size: 0.9rem; display: none; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    .add-form { padding: 16px 20px; border-top: 2px dashed #e0e0e0; display: none; }
+    .add-form h3 { font-size: 0.95rem; margin-bottom: 12px; color: #555; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .form-row input { border: 1px solid #ccc; border-radius: 4px; padding: 7px 10px; font-size: 0.9rem; }
+    .form-row input:focus { border-color: #0070d2; outline: none; }
+    .form-actions { display: flex; gap: 8px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+  <h1>MCA Advance Records</h1>
+  <span>Live OData Admin &nbsp;·&nbsp; Changes reflect instantly in Salesforce</span>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="card-header">
+      <h2>MCA Advances <span id="count" style="color:#888;font-weight:400"></span></h2>
+      <button class="btn btn-add" onclick="toggleAddForm()">+ Add Record</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Advance ID</th>
+          <th>Owner Name</th>
+          <th>SSN</th>
+          <th>Driver's License</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+
+    <div class="add-form" id="addForm">
+      <h3>New Record</h3>
+      <div class="form-row">
+        <input id="new-AdvanceId"      placeholder="Advance ID (e.g. ADV-006)"/>
+        <input id="new-OwnerName"      placeholder="Owner Name"/>
+        <input id="new-SSN"            placeholder="SSN (e.g. XXX-XX-0000)"/>
+        <input id="new-DriversLicense" placeholder="Driver's License"/>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-save" onclick="addRecord()">Save</button>
+        <button class="btn btn-cancel" onclick="toggleAddForm()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API = '';
+  let data = [];
+
+  async function load() {
+    const res = await fetch(`${API}/MCA_Advances`);
+    const json = await res.json();
+    data = json.d.results.map(r => ({
+      AdvanceId: r.AdvanceId,
+      OwnerName: r.OwnerName,
+      SSN: r.SSN,
+      DriversLicense: r.DriversLicense
+    }));
+    render();
+  }
+
+  function render() {
+    document.getElementById('count').textContent = `(${data.length})`;
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = data.map((row, i) => `
+      <tr id="row-${i}">
+        <td><span class="badge">${esc(row.AdvanceId)}</span></td>
+        <td id="cell-OwnerName-${i}">${esc(row.OwnerName)}</td>
+        <td id="cell-SSN-${i}">${esc(row.SSN)}</td>
+        <td id="cell-DriversLicense-${i}">${esc(row.DriversLicense)}</td>
+        <td><div class="actions">
+          <button class="btn btn-edit" onclick="startEdit(${i})">Edit</button>
+          <button class="btn btn-delete" onclick="deleteRecord(${i})">Delete</button>
+        </div></td>
+      </tr>
+    `).join('');
+  }
+
+  function startEdit(i) {
+    const row = data[i];
+    ['OwnerName','SSN','DriversLicense'].forEach(field => {
+      const cell = document.getElementById(`cell-${field}-${i}`);
+      cell.innerHTML = `<input class="cell-input" id="inp-${field}-${i}" value="${esc(row[field])}"/>`;
+    });
+    const actionsCell = document.querySelector(`#row-${i} .actions`);
+    actionsCell.innerHTML = `
+      <button class="btn btn-save" onclick="saveEdit(${i})">Save</button>
+      <button class="btn btn-cancel" onclick="render()">Cancel</button>
+    `;
+    document.getElementById(`inp-OwnerName-${i}`).focus();
+  }
+
+  async function saveEdit(i) {
+    const id = data[i].AdvanceId;
+    const body = {};
+    ['OwnerName','SSN','DriversLicense'].forEach(field => {
+      body[field] = document.getElementById(`inp-${field}-${i}`).value;
+    });
+    const res = await fetch(`/MCA_Advances('${id}')`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      data[i] = { ...data[i], ...body };
+      render();
+      toast('Record updated — refresh Salesforce to see the change');
+    } else {
+      toast('Error saving record', true);
+    }
+  }
+
+  async function deleteRecord(i) {
+    const id = data[i].AdvanceId;
+    if (!confirm(`Delete ${id}?`)) return;
+    const res = await fetch(`/MCA_Advances('${id}')`, { method: 'DELETE' });
+    if (res.ok) {
+      data.splice(i, 1);
+      render();
+      toast(`${id} deleted`);
+    }
+  }
+
+  function toggleAddForm() {
+    const form = document.getElementById('addForm');
+    form.style.display = form.style.display === 'block' ? 'none' : 'block';
+    if (form.style.display === 'block') document.getElementById('new-AdvanceId').focus();
+  }
+
+  async function addRecord() {
+    const body = {
+      AdvanceId:      document.getElementById('new-AdvanceId').value.trim(),
+      OwnerName:      document.getElementById('new-OwnerName').value.trim(),
+      SSN:            document.getElementById('new-SSN').value.trim(),
+      DriversLicense: document.getElementById('new-DriversLicense').value.trim()
+    };
+    if (!body.AdvanceId) { alert('Advance ID is required'); return; }
+    const res = await fetch('/MCA_Advances', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      data.push(body);
+      render();
+      toggleAddForm();
+      ['AdvanceId','OwnerName','SSN','DriversLicense'].forEach(f => document.getElementById(`new-${f}`).value = '');
+      toast('Record added — refresh Salesforce to see the change');
+    } else {
+      toast('Error adding record', true);
+    }
+  }
+
+  function toast(msg, err) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.style.background = err ? '#c0392b' : '#2e7d32';
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 3000);
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  load();
+</script>
+</body>
+</html>

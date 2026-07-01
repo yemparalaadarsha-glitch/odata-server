@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const app = express();
 app.use(express.json());
 
@@ -118,6 +119,9 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Admin UI
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
 // Service root
 app.get('/', (req, res) => {

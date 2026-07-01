@@ -63,7 +63,7 @@
     </div>
     <table>
       <thead><tr>
-        <th>File ID</th><th>Name</th><th>Est. Debt Amount</th><th>First Draft Date</th><th>Weekly Payment</th><th>Actions</th>
+        <th>File ID</th><th>Name</th><th>Est. Debt Amount</th><th>First Draft Date</th><th>Weekly Payment</th><th>NSF Date</th><th>Escrow Balance</th><th>Actions</th>
       </tr></thead>
       <tbody id="files-tbody"></tbody>
     </table>
@@ -75,6 +75,8 @@
         <input id="nf-EstimatedDebtAmount"  placeholder="Est. Debt Amount" type="number" step="0.01"/>
         <input id="nf-FirstDraftDate"       placeholder="First Draft Date" type="date"/>
         <input id="nf-CurrentWeeklyPayment" placeholder="Weekly Payment" type="number" step="0.01"/>
+        <input id="nf-NSFDate"              placeholder="NSF Date" type="date"/>
+        <input id="nf-CurrentEscrowBalance" placeholder="Escrow Balance" type="number" step="0.01"/>
       </div>
       <div class="form-actions">
         <button class="btn btn-save" onclick="addFile()">Save</button>
@@ -148,6 +150,8 @@
         <td id="fc-EstimatedDebtAmount-${i}">$${Number(f.EstimatedDebtAmount).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
         <td id="fc-FirstDraftDate-${i}">${formatDate(f.FirstDraftDate)}</td>
         <td id="fc-CurrentWeeklyPayment-${i}">$${Number(f.CurrentWeeklyPayment).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+        <td id="fc-NSFDate-${i}">${formatDate(f.NSFDate)}</td>
+        <td id="fc-CurrentEscrowBalance-${i}">$${Number(f.CurrentEscrowBalance||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
         <td><div class="actions">
           <button class="btn btn-edit" onclick="editFile(${i})">Edit</button>
           <button class="btn btn-delete" onclick="deleteFile(${i})">Delete</button>
@@ -157,7 +161,7 @@
 
   function editFile(i) {
     const f = files[i];
-    [['Name','text',f.Name],['EstimatedDebtAmount','number',f.EstimatedDebtAmount],['FirstDraftDate','date',f.FirstDraftDate?.slice(0,10)],['CurrentWeeklyPayment','number',f.CurrentWeeklyPayment]].forEach(([field,type,val]) => {
+    [['Name','text',f.Name],['EstimatedDebtAmount','number',f.EstimatedDebtAmount],['FirstDraftDate','date',f.FirstDraftDate?.slice(0,10)],['CurrentWeeklyPayment','number',f.CurrentWeeklyPayment],['NSFDate','date',f.NSFDate?.slice(0,10)],['CurrentEscrowBalance','number',f.CurrentEscrowBalance]].forEach(([field,type,val]) => {
       document.getElementById(`fc-${field}-${i}`).innerHTML =
         `<input class="cell-input" id="fi-${field}-${i}" type="${type}" ${type==='number'?'step="0.01"':''} value="${esc(String(val??''))}"/>`;
     });
@@ -173,7 +177,9 @@
       Name:                 document.getElementById(`fi-Name-${i}`).value,
       EstimatedDebtAmount:  parseFloat(document.getElementById(`fi-EstimatedDebtAmount-${i}`).value),
       FirstDraftDate:       document.getElementById(`fi-FirstDraftDate-${i}`).value + 'T00:00:00',
-      CurrentWeeklyPayment: parseFloat(document.getElementById(`fi-CurrentWeeklyPayment-${i}`).value)
+      CurrentWeeklyPayment: parseFloat(document.getElementById(`fi-CurrentWeeklyPayment-${i}`).value),
+      NSFDate:              (document.getElementById(`fi-NSFDate-${i}`).value||'') + (document.getElementById(`fi-NSFDate-${i}`).value ? 'T00:00:00' : ''),
+      CurrentEscrowBalance: parseFloat(document.getElementById(`fi-CurrentEscrowBalance-${i}`).value)
     };
     const res = await fetch(`/api/files/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     if (res.ok) { files[i] = {...files[i],...body}; renderFiles(); toast('File updated'); }
@@ -192,7 +198,9 @@
       Name:                 document.getElementById('nf-Name').value.trim(),
       EstimatedDebtAmount:  parseFloat(document.getElementById('nf-EstimatedDebtAmount').value)||0,
       FirstDraftDate:       (document.getElementById('nf-FirstDraftDate').value||'')+'T00:00:00',
-      CurrentWeeklyPayment: parseFloat(document.getElementById('nf-CurrentWeeklyPayment').value)||0
+      CurrentWeeklyPayment: parseFloat(document.getElementById('nf-CurrentWeeklyPayment').value)||0,
+      NSFDate:              document.getElementById('nf-NSFDate').value ? document.getElementById('nf-NSFDate').value+'T00:00:00' : '',
+      CurrentEscrowBalance: parseFloat(document.getElementById('nf-CurrentEscrowBalance').value)||0
     };
     if (!body.FileID) { alert('File ID is required'); return; }
     const res = await fetch('/api/files', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });

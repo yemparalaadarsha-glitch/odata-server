@@ -16,7 +16,9 @@ const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
         <Property Name="Name"                  Type="Edm.String"  Nullable="true"  MaxLength="100" FixedLength="false" Unicode="true" />
         <Property Name="EstimatedDebtAmount"   Type="Edm.Decimal" Nullable="true"  Precision="12"  Scale="2" />
         <Property Name="FirstDraftDate"        Type="Edm.DateTime" Nullable="true" />
-        <Property Name="CurrentWeeklyPayment"  Type="Edm.Decimal" Nullable="true"  Precision="10"  Scale="2" />
+        <Property Name="CurrentWeeklyPayment"  Type="Edm.Decimal"  Nullable="true"  Precision="10"  Scale="2" />
+        <Property Name="NSFDate"               Type="Edm.DateTime" Nullable="true" />
+        <Property Name="CurrentEscrowBalance"  Type="Edm.Decimal"  Nullable="true"  Precision="10"  Scale="2" />
       </EntityType>
       <EntityType Name="Account">
         <Key><PropertyRef Name="AccountID"/></Key>
@@ -53,6 +55,8 @@ const fileEntry = (req, f) => {
         <d:EstimatedDebtAmount m:type="Edm.Decimal">${f.EstimatedDebtAmount ?? ''}</d:EstimatedDebtAmount>
         <d:FirstDraftDate m:type="Edm.DateTime">${f.FirstDraftDate ?? ''}</d:FirstDraftDate>
         <d:CurrentWeeklyPayment m:type="Edm.Decimal">${f.CurrentWeeklyPayment ?? ''}</d:CurrentWeeklyPayment>
+        <d:NSFDate m:type="Edm.DateTime">${f.NSFDate ?? ''}</d:NSFDate>
+        <d:CurrentEscrowBalance m:type="Edm.Decimal">${f.CurrentEscrowBalance ?? ''}</d:CurrentEscrowBalance>
       </m:properties>
     </content>
   </entry>`;

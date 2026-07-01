@@ -17,9 +17,28 @@ const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
         <Property Name="OwnerName" Type="Edm.String" Nullable="true"/>
         <Property Name="SSN" Type="Edm.String" Nullable="true"/>
         <Property Name="DriversLicense" Type="Edm.String" Nullable="true"/>
+        <NavigationProperty Name="MCA_Documents" Relationship="MCALending.FK_Advance_Documents" ToRole="Documents" FromRole="Advance"/>
       </EntityType>
+      <EntityType Name="MCA_Document">
+        <Key>
+          <PropertyRef Name="DocumentId"/>
+        </Key>
+        <Property Name="DocumentId" Type="Edm.String" Nullable="false"/>
+        <Property Name="AdvanceId" Type="Edm.String" Nullable="true"/>
+        <Property Name="DocumentType" Type="Edm.String" Nullable="true"/>
+        <NavigationProperty Name="MCA_Advance" Relationship="MCALending.FK_Advance_Documents" ToRole="Advance" FromRole="Documents"/>
+      </EntityType>
+      <Association Name="FK_Advance_Documents">
+        <End Type="MCALending.MCA_Advance" Multiplicity="1" Role="Advance"/>
+        <End Type="MCALending.MCA_Document" Multiplicity="*" Role="Documents"/>
+      </Association>
       <EntityContainer Name="MCALendingContainer" m:IsDefaultEntityContainer="true">
         <EntitySet Name="MCA_Advances" EntityType="MCALending.MCA_Advance"/>
+        <EntitySet Name="MCA_Documents" EntityType="MCALending.MCA_Document"/>
+        <AssociationSet Name="FK_Advance_Documents_Set" Association="MCALending.FK_Advance_Documents">
+          <End Role="Advance" EntitySet="MCA_Advances"/>
+          <End Role="Documents" EntitySet="MCA_Documents"/>
+        </AssociationSet>
       </EntityContainer>
     </Schema>
   </edmx:DataServices>
@@ -94,6 +113,11 @@ app.get('/MCA_Advances', (req, res) => {
   if (req.query['$skip']) results = results.slice(parseInt(req.query['$skip']));
 
   res.json({ d: { results } });
+});
+
+// GET documents (navigation target — returns empty)
+app.get('/MCA_Documents', (req, res) => {
+  res.json({ d: { results: [] } });
 });
 
 // CREATE advance

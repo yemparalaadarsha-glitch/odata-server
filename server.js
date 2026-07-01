@@ -62,7 +62,7 @@ app.use((req, res, next) => {
     if (req.method === 'GET') {
       const advance = advances.find(a => a.AdvanceId === id);
       if (!advance) return res.status(404).json({ error: { message: 'Not found' } });
-      return res.json({ d: advance });
+      return res.json({ d: withMetadata(req, advance) });
     }
     if (req.method === 'PATCH') {
       const index = advances.findIndex(a => a.AdvanceId === id);
@@ -98,6 +98,19 @@ app.get('/', (req, res) => {
   res.send(xml);
 });
 
+const withMetadata = (req, advance) => ({
+  __metadata: {
+    uri: `https://${req.get('host')}/MCA_Advances('${advance.AdvanceId}')`,
+    type: 'MCALending.MCA_Advance'
+  },
+  ...advance,
+  MCA_Documents: {
+    __deferred: {
+      uri: `https://${req.get('host')}/MCA_Advances('${advance.AdvanceId}')/MCA_Documents`
+    }
+  }
+});
+
 // GET all advances
 app.get('/MCA_Advances', (req, res) => {
   let results = [...advances];
@@ -112,7 +125,7 @@ app.get('/MCA_Advances', (req, res) => {
   if (req.query['$top']) results = results.slice(0, parseInt(req.query['$top']));
   if (req.query['$skip']) results = results.slice(parseInt(req.query['$skip']));
 
-  res.json({ d: { results } });
+  res.json({ d: { results: results.map(a => withMetadata(req, a)) } });
 });
 
 // GET documents (navigation target — returns empty)

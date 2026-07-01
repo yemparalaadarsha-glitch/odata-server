@@ -7,16 +7,16 @@ let advances = require('./data');
 
 const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
 <edmx:Edmx Version="1.0" xmlns:edmx="http://schemas.microsoft.com/ado/2007/06/edmx">
-  <edmx:DataServices m:DataServiceVersion="2.0" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-    <Schema Namespace="MCALending" xmlns="http://schemas.microsoft.com/ado/2008/09/edm">
+  <edmx:DataServices m:DataServiceVersion="1.0" m:MaxDataServiceVersion="3.0" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+    <Schema Namespace="MCALending" xmlns="http://schemas.microsoft.com/ado/2009/11/edm" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
       <EntityType Name="MCA_Advance">
         <Key>
           <PropertyRef Name="AdvanceId"/>
         </Key>
         <Property Name="AdvanceId" Type="Edm.String" Nullable="false"/>
-        <Property Name="OwnerName" Type="Edm.String"/>
-        <Property Name="SSN" Type="Edm.String"/>
-        <Property Name="DriversLicense" Type="Edm.String"/>
+        <Property Name="OwnerName" Type="Edm.String" Nullable="true"/>
+        <Property Name="SSN" Type="Edm.String" Nullable="true"/>
+        <Property Name="DriversLicense" Type="Edm.String" Nullable="true"/>
       </EntityType>
       <EntityContainer Name="MCALendingContainer" m:IsDefaultEntityContainer="true">
         <EntitySet Name="MCA_Advances" EntityType="MCALending.MCA_Advance"/>

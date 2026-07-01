@@ -74,11 +74,15 @@ app.use((req, res, next) => {
   }
 
   const entityMatch = req.path.match(/^\/MCA_Advances\('([^']+)'\)$/);
-  if (entityMatch && req.method === 'GET') {
-    const adv = advances.find(a => a.AdvanceId === entityMatch[1]);
-    if (!adv) return res.status(404).send('Not found');
-    const base = baseUrl(req);
-    const xml = `<?xml version="1.0" encoding="utf-8"?>
+  if (entityMatch) {
+    const id = entityMatch[1];
+    const index = advances.findIndex(a => a.AdvanceId === id);
+
+    if (req.method === 'GET') {
+      if (index === -1) return res.status(404).send('Not found');
+      const adv = advances[index];
+      const base = baseUrl(req);
+      const xml = `<?xml version="1.0" encoding="utf-8"?>
 <entry xml:base="${base}/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
   <id>${base}/MCA_Advances('${adv.AdvanceId}')</id>
   <category term="MCALending.MCA_Advance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
@@ -95,8 +99,21 @@ app.use((req, res, next) => {
     </m:properties>
   </content>
 </entry>`;
-    xmlHeaders(res);
-    return res.send(xml);
+      xmlHeaders(res);
+      return res.send(xml);
+    }
+
+    if (req.method === 'PATCH' || req.method === 'PUT') {
+      if (index === -1) return res.status(404).json({ error: 'Not found' });
+      advances[index] = { ...advances[index], ...req.body };
+      return res.status(204).send();
+    }
+
+    if (req.method === 'DELETE') {
+      if (index === -1) return res.status(404).json({ error: 'Not found' });
+      advances.splice(index, 1);
+      return res.status(204).send();
+    }
   }
 
   next();

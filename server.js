@@ -7,8 +7,8 @@ let advances = require('./data');
 
 const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
 <edmx:Edmx Version="1.0" xmlns:edmx="http://schemas.microsoft.com/ado/2007/06/edmx">
-  <edmx:DataServices m:DataServiceVersion="1.0" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-    <Schema Namespace="MCALending" xmlns="http://schemas.microsoft.com/ado/2009/11/edm" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+  <edmx:DataServices xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" m:DataServiceVersion="1.0" m:MaxDataServiceVersion="3.0">
+    <Schema Namespace="MCALending" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
       <EntityType Name="MCA_Advance">
         <Key>
           <PropertyRef Name="AdvanceId"/>
@@ -26,51 +26,81 @@ const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
 </edmx:Edmx>`;
 
 const baseUrl = (req) => `https://${req.get('host')}`;
+const NOW = new Date().toISOString();
 
-const withMetadata = (req, advance) => ({
-  __metadata: {
-    uri: `${baseUrl(req)}/MCA_Advances('${advance.AdvanceId}')`,
-    type: 'MCALending.MCA_Advance'
-  },
-  ...advance
-});
+const toAtomEntry = (req, adv) => {
+  const base = baseUrl(req);
+  return `<entry>
+    <id>${base}/MCA_Advances('${adv.AdvanceId}')</id>
+    <category term="MCALending.MCA_Advance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+    <link rel="edit" title="MCA_Advance" href="MCA_Advances('${adv.AdvanceId}')"/>
+    <title/>
+    <updated>${NOW}</updated>
+    <author><name/></author>
+    <content type="application/xml">
+      <m:properties xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+        <d:AdvanceId>${esc(adv.AdvanceId)}</d:AdvanceId>
+        <d:OwnerName>${esc(adv.OwnerName)}</d:OwnerName>
+        <d:SSN>${esc(adv.SSN)}</d:SSN>
+        <d:DriversLicense>${esc(adv.DriversLicense)}</d:DriversLicense>
+      </m:properties>
+    </content>
+  </entry>`;
+};
 
-// Middleware: handle $metadata and parameterized entity routes ($ breaks Express route matching)
+const esc = (v) => String(v ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+
+const xmlHeaders = (res) => {
+  res.set('Content-Type', 'application/atom+xml;charset=utf-8');
+  res.set('Cache-Control', 'no-transform');
+  res.set('DataServiceVersion', '1.0');
+};
+
+// Middleware: $metadata + parameterized entity routes
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} | query: ${JSON.stringify(req.query)}`);
 
   if (req.path === '/$metadata') {
-    res.set('Content-Type', 'application/xml');
+    res.set('Content-Type', 'application/xml;charset=utf-8');
     res.set('Cache-Control', 'no-transform');
+    res.set('DataServiceVersion', '1.0');
     return res.send(METADATA_XML);
   }
 
   const entityMatch = req.path.match(/^\/MCA_Advances\('([^']+)'\)$/);
-  if (entityMatch) {
-    const id = entityMatch[1];
-    if (req.method === 'GET') {
-      const advance = advances.find(a => a.AdvanceId === id);
-      if (!advance) return res.status(404).json({ error: { message: 'Not found' } });
-      return res.set('Cache-Control', 'no-transform').json({ d: withMetadata(req, advance) });
-    }
-    if (req.method === 'PATCH') {
-      const index = advances.findIndex(a => a.AdvanceId === id);
-      if (index === -1) return res.status(404).json({ error: { message: 'Not found' } });
-      advances[index] = { ...advances[index], ...req.body };
-      return res.status(204).send();
-    }
-    if (req.method === 'DELETE') {
-      const index = advances.findIndex(a => a.AdvanceId === id);
-      if (index === -1) return res.status(404).json({ error: { message: 'Not found' } });
-      advances.splice(index, 1);
-      return res.status(204).send();
-    }
+  if (entityMatch && req.method === 'GET') {
+    const adv = advances.find(a => a.AdvanceId === entityMatch[1]);
+    if (!adv) return res.status(404).send('Not found');
+    const base = baseUrl(req);
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<entry xml:base="${base}/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+  <id>${base}/MCA_Advances('${adv.AdvanceId}')</id>
+  <category term="MCALending.MCA_Advance" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+  <link rel="edit" title="MCA_Advance" href="MCA_Advances('${adv.AdvanceId}')"/>
+  <title/>
+  <updated>${NOW}</updated>
+  <author><name/></author>
+  <content type="application/xml">
+    <m:properties>
+      <d:AdvanceId>${esc(adv.AdvanceId)}</d:AdvanceId>
+      <d:OwnerName>${esc(adv.OwnerName)}</d:OwnerName>
+      <d:SSN>${esc(adv.SSN)}</d:SSN>
+      <d:DriversLicense>${esc(adv.DriversLicense)}</d:DriversLicense>
+    </m:properties>
+  </content>
+</entry>`;
+    xmlHeaders(res);
+    return res.send(xml);
   }
 
   next();
 });
 
-// Service root (AtomPub service document)
+// Service root
 app.get('/', (req, res) => {
   const base = `${baseUrl(req)}/`;
   const xml = `<?xml version="1.0" encoding="utf-8"?>
@@ -82,19 +112,20 @@ app.get('/', (req, res) => {
     </collection>
   </workspace>
 </service>`;
-  res.set('Content-Type', 'application/atomsvc+xml');
+  res.set('Content-Type', 'application/atomsvc+xml;charset=utf-8');
   res.set('Cache-Control', 'no-transform');
+  res.set('DataServiceVersion', '1.0');
   res.send(xml);
 });
 
-// GET record count (e.g. Salesforce sends /MCA_Advances/$count)
+// GET count
 app.get('/MCA_Advances/\\$count', (req, res) => {
   res.set('Content-Type', 'text/plain');
-  res.set('Cache-Control', 'no-transform');
+  res.set('DataServiceVersion', '1.0');
   res.send(String(advances.length));
 });
 
-// GET all advances (with $filter, $top, $skip, $orderby, $select, $inlinecount support)
+// GET all advances — returns Atom XML feed
 app.get('/MCA_Advances', (req, res) => {
   let results = [...advances];
 
@@ -115,36 +146,26 @@ app.get('/MCA_Advances', (req, res) => {
   }
 
   const totalCount = results.length;
-
   if (req.query['$skip']) results = results.slice(parseInt(req.query['$skip']));
   if (req.query['$top']) results = results.slice(0, parseInt(req.query['$top']));
 
-  // Apply $select — only include requested fields (plus __metadata)
-  const selectFields = req.query['$select'] ? req.query['$select'].split(',').map(f => f.trim()) : null;
-  const mapped = results.map(a => {
-    const base = withMetadata(req, a);
-    if (!selectFields) return base;
-    const filtered = { __metadata: base.__metadata };
-    selectFields.forEach(f => { if (f in a) filtered[f] = a[f]; });
-    return filtered;
-  });
+  const base = baseUrl(req);
+  const countTag = (req.query['$inlinecount'] === 'allpages')
+    ? `\n  <m:count>${totalCount}</m:count>` : '';
 
-  const body = { results: mapped };
-  // $inlinecount=allpages tells us to include the total count before $top/$skip
-  if (req.query['$inlinecount'] === 'allpages') body.__count = String(totalCount);
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+<feed xml:base="${base}/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+  <title type="text">MCA_Advances</title>
+  <id>${base}/MCA_Advances</id>
+  <updated>${NOW}</updated>
+  <link rel="self" title="MCA_Advances" href="MCA_Advances"/>${countTag}
+  ${results.map(a => toAtomEntry(req, a)).join('\n  ')}
+</feed>`;
 
-  res.set('Cache-Control', 'no-transform');
-  res.json({ d: body });
-});
-
-// CREATE advance
-app.post('/MCA_Advances', (req, res) => {
-  const newAdvance = req.body;
-  if (!newAdvance.AdvanceId) return res.status(400).json({ error: { message: 'AdvanceId is required' } });
-  advances.push(newAdvance);
-  res.status(201).set('Cache-Control', 'no-transform').json({ d: withMetadata(req, newAdvance) });
+  xmlHeaders(res);
+  res.send(xml);
 });
 
 app.listen(PORT, () => {
-  console.log(`MCA OData server running on port ${PORT}`);
+  console.log(`MCA OData server (AtomPub) running on port ${PORT}`);
 });

@@ -62,7 +62,9 @@ const xmlHeaders = (res) => {
 
 // Middleware: $metadata + parameterized entity routes
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} | query: ${JSON.stringify(req.query)}`);
+  const interestingHeaders = ['accept', 'dataserviceversion', 'maxdataserviceversion', 'user-agent', 'content-type'];
+  const hdrs = Object.fromEntries(interestingHeaders.filter(h => req.headers[h]).map(h => [h, req.headers[h]]));
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} | query: ${JSON.stringify(req.query)} | headers: ${JSON.stringify(hdrs)}`);
 
   if (req.path === '/$metadata') {
     res.set('Content-Type', 'application/xml;charset=utf-8');

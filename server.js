@@ -4,23 +4,30 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-let records = require('./data');
+let { files, accounts } = require('./data');
 
 const METADATA_XML = `<?xml version="1.0" encoding="utf-8"?>
 <edmx:Edmx Version="1.0" xmlns:edmx="http://schemas.microsoft.com/ado/2007/06/edmx">
   <edmx:DataServices xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" m:DataServiceVersion="1.0" m:MaxDataServiceVersion="3.0">
-    <Schema Namespace="PublicData" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
-      <EntityType Name="PublicRecord">
-        <Key>
-          <PropertyRef Name="UserId"/>
-        </Key>
-        <Property Name="UserId" Type="Edm.String" Nullable="false" MaxLength="50" FixedLength="false" Unicode="true" />
-        <Property Name="OwnerName" Type="Edm.String" Nullable="true" MaxLength="100" FixedLength="false" Unicode="true" />
-        <Property Name="SSN" Type="Edm.String" Nullable="true" MaxLength="20" FixedLength="false" Unicode="true" />
-        <Property Name="DriversLicense" Type="Edm.String" Nullable="true" MaxLength="50" FixedLength="false" Unicode="true" />
+    <Schema Namespace="FileData" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+      <EntityType Name="File">
+        <Key><PropertyRef Name="FileID"/></Key>
+        <Property Name="FileID"                Type="Edm.String"  Nullable="false" MaxLength="50"  FixedLength="false" Unicode="true" />
+        <Property Name="Name"                  Type="Edm.String"  Nullable="true"  MaxLength="100" FixedLength="false" Unicode="true" />
+        <Property Name="EstimatedDebtAmount"   Type="Edm.Decimal" Nullable="true"  Precision="12"  Scale="2" />
+        <Property Name="FirstDraftDate"        Type="Edm.DateTime" Nullable="true" />
+        <Property Name="CurrentWeeklyPayment"  Type="Edm.Decimal" Nullable="true"  Precision="10"  Scale="2" />
       </EntityType>
-      <EntityContainer Name="PublicDataContainer" m:IsDefaultEntityContainer="true">
-        <EntitySet Name="PublicRecords" EntityType="PublicData.PublicRecord"/>
+      <EntityType Name="Account">
+        <Key><PropertyRef Name="AccountID"/></Key>
+        <Property Name="AccountID"      Type="Edm.String" Nullable="false" MaxLength="50"  FixedLength="false" Unicode="true" />
+        <Property Name="Name"           Type="Edm.String" Nullable="true"  MaxLength="100" FixedLength="false" Unicode="true" />
+        <Property Name="SSN"            Type="Edm.String" Nullable="true"  MaxLength="20"  FixedLength="false" Unicode="true" />
+        <Property Name="DriversLicense" Type="Edm.String" Nullable="true"  MaxLength="50"  FixedLength="false" Unicode="true" />
+      </EntityType>
+      <EntityContainer Name="FileDataContainer" m:IsDefaultEntityContainer="true">
+        <EntitySet Name="Files"    EntityType="FileData.File"/>
+        <EntitySet Name="Accounts" EntityType="FileData.Account"/>
       </EntityContainer>
     </Schema>
   </edmx:DataServices>
@@ -30,26 +37,40 @@ const baseUrl = (req) => `https://${req.get('host')}`;
 const NOW = new Date().toISOString();
 
 const esc = (v) => String(v ?? '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;');
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const toAtomEntry = (req, rec) => {
+const fileEntry = (req, f) => {
   const base = baseUrl(req);
   return `<entry>
-    <id>${base}/PublicRecords('${rec.UserId}')</id>
-    <category term="PublicData.PublicRecord" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
-    <link rel="edit" title="PublicRecord" href="PublicRecords('${rec.UserId}')"/>
-    <title/>
-    <updated>${NOW}</updated>
-    <author><name/></author>
+    <id>${base}/Files('${f.FileID}')</id>
+    <category term="FileData.File" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+    <link rel="edit" title="File" href="Files('${f.FileID}')"/>
+    <title/><updated>${NOW}</updated><author><name/></author>
     <content type="application/xml">
       <m:properties xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-        <d:UserId>${esc(rec.UserId)}</d:UserId>
-        <d:OwnerName>${esc(rec.OwnerName)}</d:OwnerName>
-        <d:SSN>${esc(rec.SSN)}</d:SSN>
-        <d:DriversLicense>${esc(rec.DriversLicense)}</d:DriversLicense>
+        <d:FileID>${esc(f.FileID)}</d:FileID>
+        <d:Name>${esc(f.Name)}</d:Name>
+        <d:EstimatedDebtAmount m:type="Edm.Decimal">${f.EstimatedDebtAmount ?? ''}</d:EstimatedDebtAmount>
+        <d:FirstDraftDate m:type="Edm.DateTime">${f.FirstDraftDate ?? ''}</d:FirstDraftDate>
+        <d:CurrentWeeklyPayment m:type="Edm.Decimal">${f.CurrentWeeklyPayment ?? ''}</d:CurrentWeeklyPayment>
+      </m:properties>
+    </content>
+  </entry>`;
+};
+
+const accountEntry = (req, a) => {
+  const base = baseUrl(req);
+  return `<entry>
+    <id>${base}/Accounts('${a.AccountID}')</id>
+    <category term="FileData.Account" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
+    <link rel="edit" title="Account" href="Accounts('${a.AccountID}')"/>
+    <title/><updated>${NOW}</updated><author><name/></author>
+    <content type="application/xml">
+      <m:properties xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+        <d:AccountID>${esc(a.AccountID)}</d:AccountID>
+        <d:Name>${esc(a.Name)}</d:Name>
+        <d:SSN>${esc(a.SSN)}</d:SSN>
+        <d:DriversLicense>${esc(a.DriversLicense)}</d:DriversLicense>
       </m:properties>
     </content>
   </entry>`;
@@ -61,13 +82,41 @@ const xmlHeaders = (res) => {
   res.set('DataServiceVersion', '1.0');
 };
 
-// Middleware: $metadata + parameterized entity routes
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} | query: ${JSON.stringify(req.query)}`);
+const atomFeed = (req, entitySet, entries, totalCount, showCount) => {
+  const base = baseUrl(req);
+  const countTag = showCount ? `\n  <m:count>${totalCount}</m:count>` : '';
+  return `<?xml version="1.0" encoding="utf-8"?>
+<feed xml:base="${base}/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+  <title type="text">${entitySet}</title>
+  <id>${base}/${entitySet}</id>
+  <updated>${NOW}</updated>
+  <link rel="self" title="${entitySet}" href="${entitySet}"/>${countTag}
+  ${entries.join('\n  ')}
+</feed>`;
+};
 
-  const interestingHeaders = ['accept', 'dataserviceversion', 'maxdataserviceversion', 'user-agent'];
-  const hdrs = Object.fromEntries(interestingHeaders.filter(h => req.headers[h]).map(h => [h, req.headers[h]]));
-  if (Object.keys(hdrs).length) console.log(`  headers: ${JSON.stringify(hdrs)}`);
+const applyODataParams = (arr, q) => {
+  let results = [...arr];
+  if (q['$filter']) {
+    const m = q['$filter'].match(/(\w+)\s+eq\s+'([^']+)'/);
+    if (m) results = results.filter(r => String(r[m[1]]) === m[2]);
+  }
+  if (q['$orderby']) {
+    const [field, dir] = q['$orderby'].split(/\s+/);
+    results.sort((a, b) => {
+      const cmp = String(a[field] ?? '').localeCompare(String(b[field] ?? ''));
+      return dir === 'desc' ? -cmp : cmp;
+    });
+  }
+  const total = results.length;
+  if (q['$skip']) results = results.slice(parseInt(q['$skip']));
+  if (q['$top'])  results = results.slice(0, parseInt(q['$top']));
+  return { results, total };
+};
+
+// ── Middleware: $metadata + parameterized routes ──────────────────────────────
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} | ${JSON.stringify(req.query)}`);
 
   if (req.path === '/$metadata') {
     res.set('Content-Type', 'application/xml;charset=utf-8');
@@ -76,45 +125,46 @@ app.use((req, res, next) => {
     return res.send(METADATA_XML);
   }
 
-  const entityMatch = req.path.match(/^\/PublicRecords\('([^']+)'\)$/);
-  if (entityMatch) {
-    const id = entityMatch[1];
-    const index = records.findIndex(r => r.UserId === id);
-
+  // Files('FILE-001')
+  const fileMatch = req.path.match(/^\/Files\('([^']+)'\)$/);
+  if (fileMatch) {
+    const id = fileMatch[1];
+    const i = files.findIndex(f => f.FileID === id);
     if (req.method === 'GET') {
-      if (index === -1) return res.status(404).send('Not found');
-      const rec = records[index];
-      const base = baseUrl(req);
-      const xml = `<?xml version="1.0" encoding="utf-8"?>
-<entry xml:base="${base}/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-  <id>${base}/PublicRecords('${rec.UserId}')</id>
-  <category term="PublicData.PublicRecord" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme"/>
-  <link rel="edit" title="PublicRecord" href="PublicRecords('${rec.UserId}')"/>
-  <title/>
-  <updated>${NOW}</updated>
-  <author><name/></author>
-  <content type="application/xml">
-    <m:properties>
-      <d:UserId>${esc(rec.UserId)}</d:UserId>
-      <d:OwnerName>${esc(rec.OwnerName)}</d:OwnerName>
-      <d:SSN>${esc(rec.SSN)}</d:SSN>
-      <d:DriversLicense>${esc(rec.DriversLicense)}</d:DriversLicense>
-    </m:properties>
-  </content>
-</entry>`;
+      if (i === -1) return res.status(404).send('Not found');
       xmlHeaders(res);
-      return res.send(xml);
+      return res.send(`<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">${fileEntry(req, files[i])}</feed>`);
     }
-
     if (req.method === 'PATCH' || req.method === 'PUT') {
-      if (index === -1) return res.status(404).json({ error: 'Not found' });
-      records[index] = { ...records[index], ...req.body };
+      if (i === -1) return res.status(404).send();
+      files[i] = { ...files[i], ...req.body };
       return res.status(204).send();
     }
-
     if (req.method === 'DELETE') {
-      if (index === -1) return res.status(404).json({ error: 'Not found' });
-      records.splice(index, 1);
+      if (i === -1) return res.status(404).send();
+      files.splice(i, 1);
+      return res.status(204).send();
+    }
+  }
+
+  // Accounts('ACC-001')
+  const accMatch = req.path.match(/^\/Accounts\('([^']+)'\)$/);
+  if (accMatch) {
+    const id = accMatch[1];
+    const i = accounts.findIndex(a => a.AccountID === id);
+    if (req.method === 'GET') {
+      if (i === -1) return res.status(404).send('Not found');
+      xmlHeaders(res);
+      return res.send(`<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">${accountEntry(req, accounts[i])}</feed>`);
+    }
+    if (req.method === 'PATCH' || req.method === 'PUT') {
+      if (i === -1) return res.status(404).send();
+      accounts[i] = { ...accounts[i], ...req.body };
+      return res.status(204).send();
+    }
+    if (req.method === 'DELETE') {
+      if (i === -1) return res.status(404).send();
+      accounts.splice(i, 1);
       return res.status(204).send();
     }
   }
@@ -122,96 +172,65 @@ app.use((req, res, next) => {
   next();
 });
 
-// Admin UI
+// ── Admin UI ──────────────────────────────────────────────────────────────────
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
 // JSON API for admin UI
-app.get('/api/records', (req, res) => res.json(records));
-app.post('/api/records', (req, res) => {
-  const rec = req.body;
-  if (!rec.UserId) return res.status(400).json({ error: 'UserId required' });
-  records.push(rec);
-  res.status(201).json(rec);
-});
-app.patch('/api/records/:id', (req, res) => {
-  const i = records.findIndex(r => r.UserId === req.params.id);
-  if (i === -1) return res.status(404).json({ error: 'Not found' });
-  records[i] = { ...records[i], ...req.body };
-  res.json(records[i]);
-});
-app.delete('/api/records/:id', (req, res) => {
-  const i = records.findIndex(r => r.UserId === req.params.id);
-  if (i === -1) return res.status(404).json({ error: 'Not found' });
-  records.splice(i, 1);
-  res.status(204).send();
-});
+app.get('/api/files',    (req, res) => res.json(files));
+app.post('/api/files',   (req, res) => { if (!req.body.FileID) return res.status(400).json({ error: 'FileID required' }); files.push(req.body); res.status(201).json(req.body); });
+app.patch('/api/files/:id', (req, res) => { const i = files.findIndex(f => f.FileID === req.params.id); if (i === -1) return res.status(404).send(); files[i] = { ...files[i], ...req.body }; res.json(files[i]); });
+app.delete('/api/files/:id', (req, res) => { const i = files.findIndex(f => f.FileID === req.params.id); if (i === -1) return res.status(404).send(); files.splice(i, 1); res.status(204).send(); });
 
-// Service root
+app.get('/api/accounts',    (req, res) => res.json(accounts));
+app.post('/api/accounts',   (req, res) => { if (!req.body.AccountID) return res.status(400).json({ error: 'AccountID required' }); accounts.push(req.body); res.status(201).json(req.body); });
+app.patch('/api/accounts/:id', (req, res) => { const i = accounts.findIndex(a => a.AccountID === req.params.id); if (i === -1) return res.status(404).send(); accounts[i] = { ...accounts[i], ...req.body }; res.json(accounts[i]); });
+app.delete('/api/accounts/:id', (req, res) => { const i = accounts.findIndex(a => a.AccountID === req.params.id); if (i === -1) return res.status(404).send(); accounts.splice(i, 1); res.status(204).send(); });
+
+// ── OData service root ────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   const base = `${baseUrl(req)}/`;
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
-<service xml:base="${base}" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app" xmlns="http://www.w3.org/2007/app">
-  <workspace>
-    <atom:title>Public Records</atom:title>
-    <collection href="PublicRecords">
-      <atom:title>PublicRecords</atom:title>
-    </collection>
-  </workspace>
-</service>`;
   res.set('Content-Type', 'application/atomsvc+xml;charset=utf-8');
   res.set('Cache-Control', 'no-transform');
   res.set('DataServiceVersion', '1.0');
-  res.send(xml);
+  res.send(`<?xml version="1.0" encoding="utf-8"?>
+<service xml:base="${base}" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:app="http://www.w3.org/2007/app" xmlns="http://www.w3.org/2007/app">
+  <workspace>
+    <atom:title>File Data</atom:title>
+    <collection href="Files"><atom:title>Files</atom:title></collection>
+    <collection href="Accounts"><atom:title>Accounts</atom:title></collection>
+  </workspace>
+</service>`);
 });
 
-// GET count
-app.get('/PublicRecords/\\$count', (req, res) => {
-  res.set('Content-Type', 'text/plain');
-  res.set('DataServiceVersion', '1.0');
-  res.send(String(records.length));
-});
+// ── OData entity set routes ───────────────────────────────────────────────────
+app.get('/Files/\\$count',    (req, res) => res.set('Content-Type','text/plain').send(String(files.length)));
+app.get('/Accounts/\\$count', (req, res) => res.set('Content-Type','text/plain').send(String(accounts.length)));
 
-// GET all records — Atom XML feed
-app.get('/PublicRecords', (req, res) => {
-  let results = [...records];
-
-  if (req.query['$filter']) {
-    const match = req.query['$filter'].match(/(\w+)\s+eq\s+'([^']+)'/);
-    if (match) {
-      const [, field, value] = match;
-      results = results.filter(r => String(r[field]) === value);
-    }
-  }
-
-  if (req.query['$orderby']) {
-    const [field, dir] = req.query['$orderby'].split(/\s+/);
-    results.sort((a, b) => {
-      const cmp = String(a[field] ?? '').localeCompare(String(b[field] ?? ''));
-      return dir === 'desc' ? -cmp : cmp;
-    });
-  }
-
-  const totalCount = results.length;
-  if (req.query['$skip']) results = results.slice(parseInt(req.query['$skip']));
-  if (req.query['$top']) results = results.slice(0, parseInt(req.query['$top']));
-
-  const base = baseUrl(req);
-  const countTag = req.query['$inlinecount'] === 'allpages'
-    ? `\n  <m:count>${totalCount}</m:count>` : '';
-
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
-<feed xml:base="${base}/" xmlns="http://www.w3.org/2005/Atom" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
-  <title type="text">PublicRecords</title>
-  <id>${base}/PublicRecords</id>
-  <updated>${NOW}</updated>
-  <link rel="self" title="PublicRecords" href="PublicRecords"/>${countTag}
-  ${results.map(r => toAtomEntry(req, r)).join('\n  ')}
-</feed>`;
-
+app.get('/Files', (req, res) => {
+  const { results, total } = applyODataParams(files, req.query);
   xmlHeaders(res);
-  res.send(xml);
+  res.send(atomFeed(req, 'Files', results.map(f => fileEntry(req, f)), total, req.query['$inlinecount'] === 'allpages'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Public Records OData server running on port ${PORT}`);
+app.get('/Accounts', (req, res) => {
+  const { results, total } = applyODataParams(accounts, req.query);
+  xmlHeaders(res);
+  res.send(atomFeed(req, 'Accounts', results.map(a => accountEntry(req, a)), total, req.query['$inlinecount'] === 'allpages'));
 });
+
+// POST (create)
+app.post('/Files', (req, res) => {
+  if (!req.body.FileID) return res.status(400).send();
+  files.push(req.body);
+  xmlHeaders(res);
+  res.status(201).send(fileEntry(req, req.body));
+});
+
+app.post('/Accounts', (req, res) => {
+  if (!req.body.AccountID) return res.status(400).send();
+  accounts.push(req.body);
+  xmlHeaders(res);
+  res.status(201).send(accountEntry(req, req.body));
+});
+
+app.listen(PORT, () => console.log(`OData server running on port ${PORT}`));
